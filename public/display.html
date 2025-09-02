@@ -98,38 +98,7 @@
         @keyframes blink {
             50% { opacity: 0; }
         }
-        
-        #optionsPanel {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.9);
-            border: 3px solid #FFD700;
-            padding: 15px;
-            display: none;
-            max-width: 800px;
-        }
-        
-        .options-list {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            font-size: 11px;
-            color: white;
-        }
-        
-        .option-item {
-            text-align: left;
-            padding: 5px;
-        }
-        
-        .option-letter {
-            color: #FFD700;
-            font-weight: bold;
-            margin-right: 10px;
-        }
-    </style>
+</style>
 </head>
 <body>
     <div id="gameContainer">
@@ -139,10 +108,7 @@
     <div id="questionPanel">
         <div id="questionText" class="pixel-text"></div>
     </div>
-    
-    <div id="optionsPanel">
-        <div class="options-list pixel-text" id="optionsList"></div>
-    </div>
+</div>
     
     <div id="resultPanel">
         <h2 class="pixel-text" style="color: #FFD700; margin-bottom: 20px;">RESULTS</h2>
@@ -203,11 +169,10 @@
         
         // Zone configuration
         const zones = [
-            { x: 100, y: 50, width: 120, height: 120, answer: 'A', color: '#FF6B6B', bgColor: '#8B0000' },
-            { x: 270, y: 50, width: 120, height: 120, answer: 'B', color: '#4ECDC4', bgColor: '#008B8B' },
-            { x: 460, y: 50, width: 120, height: 120, answer: 'C', color: '#45B7D1', bgColor: '#4682B4' },
-            { x: 630, y: 50, width: 120, height: 120, answer: 'D', color: '#F9CA24', bgColor: '#DAA520' }
-        ];
+            { x: 155, y: 50, width: 120, height: 120, answer: 'A', color: '#FF6B6B', bgColor: '#8B0000' },
+            { x: 365, y: 50, width: 120, height: 120, answer: 'B', color: '#4ECDC4', bgColor: '#008B8B' },
+            { x: 575, y: 50, width: 120, height: 120, answer: 'C', color: '#45B7D1', bgColor: '#4682B4' },
+                    ];
         
         // Effect class
         class Effect {
@@ -542,15 +507,6 @@
             `;
             
             // Show options at bottom with better formatting
-            document.getElementById('optionsPanel').style.display = 'block';
-            const optionsHtml = currentQuestion.options.map(option => {
-                const [letter, text] = option.split(': ');
-                return `<div class="option-item">
-                    <span class="option-letter">${letter}:</span>${text}
-                </div>`;
-            }).join('');
-            document.getElementById('optionsList').innerHTML = optionsHtml;
-            
             players.clear();
             if (data.players) {
                 data.players.forEach(playerData => {
@@ -618,13 +574,11 @@
         socket.on('show-results', (results) => {
             document.getElementById('resultPanel').style.display = 'block';
             document.getElementById('questionPanel').style.display = 'none';
-            document.getElementById('optionsPanel').style.display = 'none';
-            
             let html = '<div class="pixel-text">';
             html += `<p style="margin: 10px 0; color: #00FF00;">CORRECT: ${results.correctAnswer}</p>`;
             html += '<div style="margin: 20px 0;">';
             
-            ['A', 'B', 'C', 'D'].forEach(option => {
+            ['A','B','C'].forEach(option => {
                 const count = results.stats[option] || 0;
                 const isCorrect = option === results.correctAnswer;
                 html += `<div style="display: inline-block; margin: 0 10px;">

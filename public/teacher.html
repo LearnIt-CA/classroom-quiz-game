@@ -162,7 +162,7 @@
         
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 10px;
             margin-top: 20px;
         }
@@ -313,10 +313,6 @@
                         <div>C</div>
                         <div class="stat-value" id="countC">0</div>
                     </div>
-                    <div class="stat-card" id="statCardD">
-                        <div>D</div>
-                        <div class="stat-value" id="countD">0</div>
-                    </div>
                 </div>
             </div>
         </div>
@@ -338,7 +334,7 @@
         const socket = io();
         let currentQuestionIndex = -1;
         let questions = [];
-        let answerCounts = { A: 0, B: 0, C: 0, D: 0 };
+        let answerCounts = { A: 0, B: 0, C: 0 };
         let gameStarted = false;
         let displayConnected = false;
         let displayWindow = null;
@@ -391,7 +387,7 @@
                     <div style="color: #FFD700;">QUESTION ${index + 1}</div>
                     <div style="font-size: 10px; margin-top: 8px;">${q.question}</div>
                     <div style="font-size: 8px; color: #888; margin-top: 5px;">
-                        ${q.options.join(' | ')}
+                        ${q.options.filter(op => !op.startsWith('D:')).join(' | ')}
                     </div>
                 </div>
             `).join('');
@@ -458,11 +454,11 @@
         }
         
         function resetCounts() {
-            answerCounts = { A: 0, B: 0, C: 0, D: 0 };
+            answerCounts = { A: 0, B: 0, C: 0 };
             updateCountDisplay();
             
             // Reset styles
-            ['A', 'B', 'C', 'D'].forEach(option => {
+            ['A','B','C'].forEach(option => {
                 document.getElementById(`statCard${option}`).classList.remove('correct');
             });
         }
@@ -471,8 +467,7 @@
             document.getElementById('countA').textContent = answerCounts.A;
             document.getElementById('countB').textContent = answerCounts.B;
             document.getElementById('countC').textContent = answerCounts.C;
-            document.getElementById('countD').textContent = answerCounts.D;
-        }
+            }
         
         function updateStatus() {
             fetch('/api/game-status')
@@ -538,14 +533,15 @@
         
         socket.on('player-answered', (data) => {
             console.log('Player answered:', data);
-            answerCounts[data.answer]++;
+            if (answerCounts[data.answer] !== undefined) { answerCounts[data.answer]++; }
             updateCountDisplay();
         });
         
         socket.on('show-results', (results) => {
             // Highlight correct answer
             if (results.correctAnswer) {
-                document.getElementById(`statCard${results.correctAnswer}`).classList.add('correct');
+                const _card = document.getElementById(`statCard${results.correctAnswer}`);
+                if (_card) _card.classList.add('correct');
             }
         });
         
