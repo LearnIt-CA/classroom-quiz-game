@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pixel Quiz - Teacher Console</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Press Start 2P', monospace;
+            background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1e 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: white;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .pixel-panel {
+            background: #222;
+            border: 4px solid #FFD700;
+            box-shadow: 
+                0 0 0 4px #000,
+                0 0 0 8px #FFD700,
+                0 10px 20px rgba(0,0,0,0.5);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            color: #FFD700;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 24px;
+            text-shadow: 3px 3px 0 #000;
+        }
+        
+        h2 {
+            color: #FFD700;
+            font-size: 14px;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 0 #000;
+        }
+        
+        .status-bar {
+            text-align: center;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            align-items: center;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 12px;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            background: #FF0000;
+            border: 2px solid #000;
+        }
+        
+        .status-indicator.connected {
+            background: #00FF00;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        #qrcode {
+            text-align: center;
+            padding: 20px;
+            background: white;
+        }
+        
+        #qrcode img {
+            image-rendering: pixelated;
+        }
+        
+        .url-display {
+            background: #000;
+            color: #0F0;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            margin-top: 10px;
+            word-break: break-all;
+            border: 2px solid #0F0;
+        }
+        
+        .btn {
+            background: #FFD700;
+            color: #000;
+            border: 3px solid #000;
+            padding: 12px 24px;
+            font-size: 12px;
+            cursor: pointer;
+            margin: 5px;
+            box-shadow: 0 4px 0 #B8860B;
+            transition: all 0.1s;
+            font-family: 'Press Start 2P', monospace;
+        }
+        
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 0 #B8860B;
+        }
+        
+        .btn:active:not(:disabled) {
+            transform: translateY(2px);
+            box-shadow: 0 2px 0 #B8860B;
+        }
+        
+        .btn:disabled {
+            background: #666;
+            color: #333;
+            cursor: not-allowed;
+            box-shadow: 0 4px 0 #444;
+        }
+        
+        .btn-start {
+            background: #00FF00;
+            box-shadow: 0 4px 0 #00AA00;
+        }
+        
+        .btn-start:hover:not(:disabled) {
+            box-shadow: 0 6px 0 #00AA00;
+        }
+        
+        .btn-next {
+            background: #00BFFF;
+            box-shadow: 0 4px 0 #0088AA;
+        }
+        
+        .btn-display {
+            background: #FF69B4;
+            box-shadow: 0 4px 0 #CC1166;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .stat-card {
+            background: #333;
+            border: 2px solid #666;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .stat-card.correct {
+            border-color: #00FF00;
+            background: #003300;
+            animation: blink 0.5s 3;
+        }
+        
+        @keyframes blink {
+            50% { background: #00FF00; }
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            color: #FFD700;
+            margin-top: 10px;
+        }
+        
+        .question-item {
+            background: #333;
+            border: 2px solid #666;
+            padding: 15px;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .question-item:hover {
+            border-color: #FFD700;
+            transform: translateX(5px);
+        }
+        
+        .question-item.active {
+            background: #4B0082;
+            border-color: #FFD700;
+        }
+        
+        .player-counter {
+            display: inline-block;
+            background: #00FF00;
+            color: #000;
+            padding: 5px 15px;
+            font-size: 12px;
+            border: 2px solid #000;
+        }
+        
+        .control-buttons {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .warning {
+            background: #FF6B6B;
+            border: 2px solid #CC0000;
+            padding: 10px;
+            margin: 10px 0;
+            text-align: center;
+            font-size: 10px;
+        }
+        
+        .debug-info {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            border: 1px solid #0F0;
+            padding: 10px;
+            font-size: 10px;
+            font-family: monospace;
+            color: #0F0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 PIXEL QUIZ - TEACHER CONSOLE 🎮</h1>
+        
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-indicator" id="displayIndicator"></div>
+                <span>DISPLAY</span>
+            </div>
+            <div class="status-item">
+                <span>PLAYERS:</span>
+                <span class="player-counter" id="playerCount">0</span>
+            </div>
+            <div class="status-item">
+                <span id="gameStatus">NOT STARTED</span>
+            </div>
+        </div>
+        
+        <div class="grid">
+            <!-- QR Code Section -->
+            <div class="pixel-panel">
+                <h2>📱 STUDENT ENTRY</h2>
+                <div id="qrcode">
+                    <p style="color: #666;">Generating...</p>
+                </div>
+                <div class="url-display" id="gameUrl">
+                    LOADING...
+                </div>
+            </div>
+            
+            <!-- Game Control -->
+            <div class="pixel-panel">
+                <h2>🎯 GAME CONTROL</h2>
+                <div class="control-buttons">
+                    <button class="btn btn-display" onclick="openDisplay()" id="btnDisplay">
+                        📺 OPEN DISPLAY
+                    </button>
+                    <br><br>
+                    <button class="btn btn-start" onclick="startGame()" id="btnStartGame" disabled>
+                        ▶ START GAME
+                    </button>
+                    <br><br>
+                    <button class="btn btn-next" onclick="nextQuestion()" id="btnNextQuestion" disabled>
+                        NEXT QUESTION
+                    </button>
+                    <button class="btn" onclick="showResults()" id="btnShowResults" disabled>
+                        📊 SHOW RESULTS
+                    </button>
+                </div>
+                
+                <div id="warningMessage" class="warning" style="display: none;">
+                    ⚠️ Please open display first!
+                </div>
+                
+                <!-- Answer Statistics -->
+                <div class="stats-grid">
+                    <div class="stat-card" id="statCardA">
+                        <div>A</div>
+                        <div class="stat-value" id="countA">0</div>
+                    </div>
+                    <div class="stat-card" id="statCardB">
+                        <div>B</div>
+                        <div class="stat-value" id="countB">0</div>
+                    </div>
+                    <div class="stat-card" id="statCardC">
+                        <div>C</div>
+                        <div class="stat-value" id="countC">0</div>
+                    </div>
+                    <div class="stat-card" id="statCardD">
+                        <div>D</div>
+                        <div class="stat-value" id="countD">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Questions List -->
+        <div class="pixel-panel">
+            <h2>📝 QUESTIONS</h2>
+            <div id="questionList"></div>
+        </div>
+    </div>
+    
+    <div class="debug-info" id="debugInfo">
+        Socket: <span id="socketStatus">Connecting...</span><br>
+        Display: <span id="displayDebug">Not connected</span>
+    </div>
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let currentQuestionIndex = -1;
+        let questions = [];
+        let answerCounts = { A: 0, B: 0, C: 0, D: 0 };
+        let gameStarted = false;
+        let displayConnected = false;
+        let displayWindow = null;
+        
+        // Connect as teacher when socket connects
+        socket.on('connect', () => {
+            console.log('Connected to server');
+            document.getElementById('socketStatus').textContent = 'Connected';
+            socket.emit('teacher-connect');
+        });
+        
+        socket.on('disconnect', () => {
+            document.getElementById('socketStatus').textContent = 'Disconnected';
+        });
+        
+        window.onload = function() {
+            // Get QR code
+            fetch('/api/qrcode')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('qrcode').innerHTML = 
+                            `<img src="${data.qrcode}" alt="QR Code" />`;
+                        document.getElementById('gameUrl').textContent = data.url;
+                    }
+                })
+                .catch(err => {
+                    console.error('Error getting QR code:', err);
+                });
+            
+            // Get questions
+            fetch('/api/questions')
+                .then(response => response.json())
+                .then(data => {
+                    questions = data;
+                    renderQuestions();
+                })
+                .catch(err => {
+                    console.error('Error getting questions:', err);
+                });
+            
+            // Update status periodically
+            setInterval(updateStatus, 1000);
+        };
+        
+        function renderQuestions() {
+            const list = document.getElementById('questionList');
+            list.innerHTML = questions.map((q, index) => `
+                <div class="question-item ${index === currentQuestionIndex ? 'active' : ''}">
+                    <div style="color: #FFD700;">QUESTION ${index + 1}</div>
+                    <div style="font-size: 10px; margin-top: 8px;">${q.question}</div>
+                    <div style="font-size: 8px; color: #888; margin-top: 5px;">
+                        ${q.options.join(' | ')}
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function openDisplay() {
+            // Check if window already exists and is not closed
+            if (displayWindow && !displayWindow.closed) {
+                displayWindow.focus();
+                return;
+            }
+            
+            // Open new display window
+            displayWindow = window.open('/display', 'gameDisplay', 'width=900,height=700');
+            
+            if (!displayWindow) {
+                alert('Please allow popups for this site!');
+                return;
+            }
+            
+            // Check connection status after window loads
+            displayWindow.addEventListener('load', () => {
+                console.log('Display window loaded');
+            });
+        }
+        
+        function startGame() {
+            if (!displayConnected) {
+                document.getElementById('warningMessage').style.display = 'block';
+                setTimeout(() => {
+                    document.getElementById('warningMessage').style.display = 'none';
+                }, 3000);
+                return;
+            }
+            
+            socket.emit('teacher-start-game');
+        }
+        
+        function nextQuestion() {
+            if (!displayConnected) {
+                alert('Display not connected!');
+                return;
+            }
+            
+            socket.emit('teacher-next-question');
+            currentQuestionIndex++;
+            if (currentQuestionIndex >= questions.length) {
+                currentQuestionIndex = 0;
+            }
+            renderQuestions();
+            resetCounts();
+            document.getElementById('btnShowResults').disabled = false;
+            document.getElementById('gameStatus').textContent = `QUESTION ${currentQuestionIndex + 1}`;
+        }
+        
+        function showResults() {
+            if (!displayConnected) {
+                alert('Display not connected!');
+                return;
+            }
+            
+            socket.emit('teacher-show-results');
+            document.getElementById('gameStatus').textContent = 'SHOWING RESULTS';
+        }
+        
+        function resetCounts() {
+            answerCounts = { A: 0, B: 0, C: 0, D: 0 };
+            updateCountDisplay();
+            
+            // Reset styles
+            ['A', 'B', 'C', 'D'].forEach(option => {
+                document.getElementById(`statCard${option}`).classList.remove('correct');
+            });
+        }
+        
+        function updateCountDisplay() {
+            document.getElementById('countA').textContent = answerCounts.A;
+            document.getElementById('countB').textContent = answerCounts.B;
+            document.getElementById('countC').textContent = answerCounts.C;
+            document.getElementById('countD').textContent = answerCounts.D;
+        }
+        
+        function updateStatus() {
+            fetch('/api/game-status')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('playerCount').textContent = data.playerCount;
+                })
+                .catch(err => {
+                    console.error('Error updating status:', err);
+                });
+        }
+        
+        // Socket events
+        socket.on('teacher-state', (state) => {
+            console.log('Received teacher state:', state);
+            gameStarted = state.isGameStarted;
+            displayConnected = state.displayConnected;
+            
+            if (gameStarted) {
+                document.getElementById('btnStartGame').disabled = true;
+                document.getElementById('btnStartGame').textContent = 'GAME STARTED';
+                document.getElementById('btnNextQuestion').disabled = false;
+                document.getElementById('gameStatus').textContent = 'GAME IN PROGRESS';
+            }
+            
+            updateDisplayStatus(displayConnected);
+        });
+        
+        socket.on('display-status', (data) => {
+            console.log('Display status update:', data.connected);
+            displayConnected = data.connected;
+            updateDisplayStatus(displayConnected);
+        });
+        
+        function updateDisplayStatus(connected) {
+            const indicator = document.getElementById('displayIndicator');
+            const startBtn = document.getElementById('btnStartGame');
+            
+            document.getElementById('displayDebug').textContent = connected ? 'Connected' : 'Not connected';
+            
+            if (connected) {
+                indicator.classList.add('connected');
+                if (!gameStarted) {
+                    startBtn.disabled = false;
+                }
+                console.log('Display connected - Start button enabled');
+            } else {
+                indicator.classList.remove('connected');
+                if (!gameStarted) {
+                    startBtn.disabled = true;
+                }
+                console.log('Display disconnected - Start button disabled');
+            }
+        }
+        
+        socket.on('game-started', () => {
+            gameStarted = true;
+            document.getElementById('btnStartGame').disabled = true;
+            document.getElementById('btnStartGame').textContent = 'GAME STARTED';
+            document.getElementById('btnNextQuestion').disabled = false;
+            document.getElementById('gameStatus').textContent = 'WAITING FOR PLAYERS';
+        });
+        
+        socket.on('player-answered', (data) => {
+            console.log('Player answered:', data);
+            answerCounts[data.answer]++;
+            updateCountDisplay();
+        });
+        
+        socket.on('show-results', (results) => {
+            // Highlight correct answer
+            if (results.correctAnswer) {
+                document.getElementById(`statCard${results.correctAnswer}`).classList.add('correct');
+            }
+        });
+        
+        socket.on('error', (data) => {
+            alert(data.message);
+        });
+    </script>
+</body>
+</html>

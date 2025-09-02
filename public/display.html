@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pixel Quiz - Game Display</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+        
+        body {
+            background: #2C2C2C;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Press Start 2P', monospace;
+        }
+        
+        #gameContainer {
+            background: #1a1a1a;
+            padding: 20px;
+            border: 4px solid #444;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+        
+        #gameCanvas {
+            background: #000;
+            display: block;
+        }
+        
+        #questionPanel {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #8B008B, #4B0082);
+            border: 4px solid #FFD700;
+            padding: 20px;
+            color: white;
+            text-align: center;
+            font-size: 14px;
+            line-height: 1.8;
+            box-shadow: 
+                0 0 0 4px #000,
+                0 0 0 8px #FFD700,
+                0 10px 20px rgba(0,0,0,0.5);
+            max-width: 600px;
+            display: none;
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateX(-50%) translateY(0); }
+            50% { transform: translateX(-50%) translateY(-10px); }
+        }
+        
+        #resultPanel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #222;
+            border: 4px solid #FFD700;
+            padding: 30px;
+            display: none;
+            text-align: center;
+            color: white;
+            box-shadow: 0 0 0 4px #000, 0 0 50px rgba(255,215,0,0.5);
+            min-width: 400px;
+        }
+        
+        .pixel-text {
+            font-family: 'Press Start 2P', monospace;
+            text-shadow: 2px 2px 0 #000;
+        }
+        
+        #waitingScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+        }
+        
+        .blink {
+            animation: blink 1s step-start infinite;
+        }
+        
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+        
+        #optionsPanel {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.9);
+            border: 3px solid #FFD700;
+            padding: 15px;
+            display: none;
+            max-width: 800px;
+        }
+        
+        .options-list {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            font-size: 11px;
+            color: white;
+        }
+        
+        .option-item {
+            text-align: left;
+            padding: 5px;
+        }
+        
+        .option-letter {
+            color: #FFD700;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="850" height="600"></canvas>
+    </div>
+    
+    <div id="questionPanel">
+        <div id="questionText" class="pixel-text"></div>
+    </div>
+    
+    <div id="optionsPanel">
+        <div class="options-list pixel-text" id="optionsList"></div>
+    </div>
+    
+    <div id="resultPanel">
+        <h2 class="pixel-text" style="color: #FFD700; margin-bottom: 20px;">RESULTS</h2>
+        <div id="resultContent"></div>
+    </div>
+    
+    <div id="waitingScreen">
+        <h1 class="pixel-text" style="color: #FFD700;">PIXEL QUIZ</h1>
+        <p class="pixel-text blink" style="margin-top: 20px; font-size: 12px;">Waiting to start...</p>
+    </div>
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        
+        const socket = io();
+        const players = new Map();
+        const effects = [];
+        let currentQuestion = null;
+        let gameStarted = false;
+        let isWaitingForPlayers = false;
+        let isQuestionActive = false;
+        let bee = { x: 425, y: 300, wingFrame: 0 };
+        
+        // Connect as display
+        socket.on('connect', () => {
+            console.log('Display connected to server');
+            socket.emit('display-connect');
+        });
+        
+        socket.on('reconnect', () => {
+            console.log('Display reconnected');
+            socket.emit('display-connect');
+        });
+        
+        // Pixel patterns for characters
+        const spritePatterns = {
+            robot: [[0,1,1,1,0],[1,0,1,0,1],[1,1,1,1,1],[1,1,1,1,1],[1,0,0,0,1]],
+            ghost: [[0,1,1,1,0],[1,1,1,1,1],[1,0,1,0,1],[1,1,1,1,1],[1,0,1,0,1]],
+            alien: [[1,0,0,0,1],[0,1,1,1,0],[1,0,1,0,1],[1,1,1,1,1],[0,1,0,1,0]],
+            knight: [[0,1,1,1,0],[1,1,1,1,1],[0,1,1,1,0],[1,1,1,1,1],[1,0,0,0,1]],
+            wizard: [[0,0,1,0,0],[0,1,1,1,0],[1,1,0,1,1],[1,1,1,1,1],[0,1,1,1,0]],
+            ninja: [[1,1,1,1,1],[1,0,0,0,1],[1,1,1,1,1],[0,1,1,1,0],[1,0,0,0,1]],
+            cat: [[1,0,0,0,1],[1,1,1,1,1],[1,0,1,0,1],[1,1,1,1,1],[0,1,0,1,0]],
+            bear: [[1,0,0,0,1],[1,1,1,1,1],[1,1,1,1,1],[1,0,1,0,1],[1,1,1,1,1]]
+        };
+        
+        // Simple bee pattern - much cleaner!
+        const simpleBeePattern = [
+            [0,1,0,1,0],
+            [1,1,1,1,1],
+            [0,1,0,1,0],
+            [1,1,1,1,1],
+            [0,1,1,1,0]
+        ];
+        
+        // Zone configuration
+        const zones = [
+            { x: 100, y: 50, width: 120, height: 120, answer: 'A', color: '#FF6B6B', bgColor: '#8B0000' },
+            { x: 270, y: 50, width: 120, height: 120, answer: 'B', color: '#4ECDC4', bgColor: '#008B8B' },
+            { x: 460, y: 50, width: 120, height: 120, answer: 'C', color: '#45B7D1', bgColor: '#4682B4' },
+            { x: 630, y: 50, width: 120, height: 120, answer: 'D', color: '#F9CA24', bgColor: '#DAA520' }
+        ];
+        
+        // Effect class
+        class Effect {
+            constructor(x, y, type, color) {
+                this.x = x;
+                this.y = y;
+                this.type = type;
+                this.color = color || '#FFD700';
+                this.frame = 0;
+                this.maxFrames = 30;
+            }
+            
+            update() {
+                this.frame++;
+                return this.frame < this.maxFrames;
+            }
+            
+            draw() {
+                ctx.save();
+                const progress = this.frame / this.maxFrames;
+                ctx.globalAlpha = 1 - progress;
+                
+                if (this.type === 'answer') {
+                    for (let i = 0; i < 8; i++) {
+                        const angle = (Math.PI * 2 / 8) * i;
+                        const distance = progress * 50;
+                        const x = this.x + Math.cos(angle) * distance;
+                        const y = this.y + Math.sin(angle) * distance;
+                        ctx.fillStyle = this.color;
+                        ctx.fillRect(x - 4, y - 4, 8, 8);
+                    }
+                } else if (this.type === 'collision') {
+                    ctx.fillStyle = '#FF0000';
+                    const size = 20 * (1 - progress);
+                    for (let i = 0; i < 4; i++) {
+                        const angle = (Math.PI * 2 / 4) * i + progress * Math.PI;
+                        const x = this.x + Math.cos(angle) * size;
+                        const y = this.y + Math.sin(angle) * size;
+                        ctx.fillRect(x - 3, y - 3, 6, 6);
+                    }
+                } else if (this.type === 'move') {
+                    ctx.fillStyle = '#888';
+                    const size = 6 - progress * 4;
+                    ctx.fillRect(this.x - size/2, this.y - size/2, size, size);
+                } else if (this.type === 'join') {
+                    ctx.fillStyle = this.color;
+                    const size = 20 * (1 + progress);
+                    ctx.globalAlpha = (1 - progress) * 0.5;
+                    ctx.fillRect(this.x - size/2, this.y - size/2, size, size);
+                }
+                
+                ctx.restore();
+            }
+        }
+        
+        // Player class
+        class Player {
+            constructor(data) {
+                this.id = data.id;
+                this.name = data.name;
+                this.x = data.x;
+                this.y = data.y;
+                this.targetX = data.x;
+                this.targetY = data.y;
+                this.sprite = data.sprite;
+                this.pattern = spritePatterns[data.sprite.pattern] || spritePatterns.robot;
+                this.currentAnswer = data.currentAnswer;
+                this.score = data.score;
+                this.frameCount = 0;
+                this.jumpHeight = 0;
+                this.isMoving = false;
+            }
+            
+            update() {
+                if (Math.abs(this.targetX - this.x) > 1 || Math.abs(this.targetY - this.y) > 1) {
+                    this.isMoving = true;
+                    this.x += (this.targetX - this.x) * 0.3;
+                    this.y += (this.targetY - this.y) * 0.3;
+                    this.jumpHeight = Math.sin(this.frameCount * 0.5) * 3;
+                } else {
+                    this.isMoving = false;
+                    this.jumpHeight = 0;
+                }
+                this.frameCount++;
+            }
+            
+            draw() {
+                if (isQuestionActive && this.currentAnswer) return;
+                
+                const drawY = this.y - this.jumpHeight;
+                
+                // Shadow
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.fillRect(this.x - 12, this.y + 10, 24, 6);
+                
+                // Draw pixel character
+                const pixelSize = 4;
+                const offsetX = this.x - (this.pattern[0].length * pixelSize) / 2;
+                const offsetY = drawY - (this.pattern.length * pixelSize) / 2;
+                
+                ctx.fillStyle = this.sprite.color;
+                for (let row = 0; row < this.pattern.length; row++) {
+                    for (let col = 0; col < this.pattern[row].length; col++) {
+                        if (this.pattern[row][col] === 1) {
+                            ctx.fillRect(
+                                offsetX + col * pixelSize,
+                                offsetY + row * pixelSize,
+                                pixelSize,
+                                pixelSize
+                            );
+                        }
+                    }
+                }
+                
+                // Eyes
+                ctx.fillStyle = '#FFF';
+                const eyeY = offsetY + pixelSize;
+                const eyeBlink = Math.random() > 0.98;
+                if (!eyeBlink) {
+                    ctx.fillRect(offsetX + pixelSize, eyeY, 2, 2);
+                    ctx.fillRect(offsetX + pixelSize * 3, eyeY, 2, 2);
+                }
+                
+                // Name
+                ctx.save();
+                ctx.font = '10px "Press Start 2P"';
+                ctx.fillStyle = '#FFF';
+                ctx.textAlign = 'center';
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 3;
+                ctx.strokeText(this.name, this.x, drawY - 20);
+                ctx.fillText(this.name, this.x, drawY - 20);
+                ctx.restore();
+            }
+        }
+        
+        // Draw simple bee
+        function drawBee() {
+            if (!isQuestionActive) return;
+            
+            const pixelSize = 4;
+            const beeWidth = simpleBeePattern[0].length;
+            const beeHeight = simpleBeePattern.length;
+            const offsetX = bee.x - (beeWidth * pixelSize) / 2;
+            const offsetY = bee.y - (beeHeight * pixelSize) / 2;
+            
+            // Simple wings (just lines)
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.lineWidth = 2;
+            const wingOffset = Math.sin(bee.wingFrame * 0.5) * 3;
+            ctx.beginPath();
+            ctx.moveTo(bee.x - 10, bee.y - wingOffset);
+            ctx.lineTo(bee.x - 20, bee.y - 5 - wingOffset);
+            ctx.moveTo(bee.x + 10, bee.y + wingOffset);
+            ctx.lineTo(bee.x + 20, bee.y - 5 + wingOffset);
+            ctx.stroke();
+            
+            // Draw bee body
+            for (let row = 0; row < simpleBeePattern.length; row++) {
+                for (let col = 0; col < simpleBeePattern[row].length; col++) {
+                    if (simpleBeePattern[row][col] === 1) {
+                        // Alternating yellow and black stripes
+                        ctx.fillStyle = (row % 2 === 0) ? '#FFD700' : '#000';
+                        ctx.fillRect(
+                            offsetX + col * pixelSize,
+                            offsetY + row * pixelSize,
+                            pixelSize,
+                            pixelSize
+                        );
+                    }
+                }
+            }
+            
+            // Simple eye
+            ctx.fillStyle = '#FFF';
+            ctx.fillRect(offsetX + pixelSize, offsetY + pixelSize, 2, 2);
+            
+            bee.wingFrame++;
+            
+            // Warning text
+            ctx.save();
+            ctx.font = '10px "Press Start 2P"';
+            ctx.fillStyle = '#FFD700';
+            ctx.textAlign = 'center';
+            ctx.fillText('BEE!', bee.x, bee.y - 15);
+            ctx.restore();
+        }
+        
+        // Main game loop
+        function gameLoop() {
+            // Clear canvas
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Grid background
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= canvas.width; i += 25) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, canvas.height);
+                ctx.stroke();
+            }
+            for (let i = 0; i <= canvas.height; i += 25) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(canvas.width, i);
+                ctx.stroke();
+            }
+            
+            // Draw game elements when question is active
+            if (isQuestionActive && currentQuestion) {
+                // Draw zones with just letters (no text)
+                zones.forEach((zone, index) => {
+                    ctx.fillStyle = zone.bgColor;
+                    ctx.fillRect(zone.x, zone.y, zone.width, zone.height);
+                    
+                    ctx.strokeStyle = zone.color;
+                    ctx.lineWidth = 4;
+                    ctx.strokeRect(zone.x, zone.y, zone.width, zone.height);
+                    
+                    ctx.strokeStyle = '#FFF';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(zone.x + 4, zone.y + 4, zone.width - 8, zone.height - 8);
+                    
+                    // Only draw the letter, big and clear
+                    ctx.save();
+                    ctx.font = 'bold 64px "Press Start 2P"';
+                    ctx.fillStyle = '#FFF';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 4;
+                    const centerX = zone.x + zone.width / 2;
+                    const centerY = zone.y + zone.height / 2;
+                    ctx.strokeText(zone.answer, centerX, centerY);
+                    ctx.fillText(zone.answer, centerX, centerY);
+                    ctx.restore();
+                });
+                
+                // Play area boundary
+                ctx.strokeStyle = '#666';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.strokeRect(50, 200, 750, 380);
+                ctx.setLineDash([]);
+            }
+            
+            // Waiting message
+            if (isWaitingForPlayers && !isQuestionActive) {
+                ctx.save();
+                ctx.font = '16px "Press Start 2P"';
+                ctx.fillStyle = '#FFD700';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('WAITING FOR PLAYERS', canvas.width / 2, canvas.height / 2 - 50);
+                ctx.font = '10px "Press Start 2P"';
+                ctx.fillStyle = '#FFF';
+                ctx.fillText(`${players.size} PLAYERS JOINED`, canvas.width / 2, canvas.height / 2 - 20);
+                ctx.fillStyle = '#0F0';
+                ctx.fillText('Players can move around!', canvas.width / 2, canvas.height / 2 + 10);
+                ctx.restore();
+            }
+            
+            // Update and draw effects
+            for (let i = effects.length - 1; i >= 0; i--) {
+                const effect = effects[i];
+                if (!effect.update()) {
+                    effects.splice(i, 1);
+                } else {
+                    effect.draw();
+                }
+            }
+            
+            // Update and draw players
+            players.forEach(player => {
+                player.update();
+                player.draw();
+            });
+            
+            // Draw bee
+            drawBee();
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Socket events
+        socket.on('game-state', (data) => {
+            console.log('Received game state:', data);
+            gameStarted = data.isGameStarted;
+            isWaitingForPlayers = data.isWaitingForPlayers;
+            isQuestionActive = data.isQuestionActive;
+            currentQuestion = data.currentQuestion;
+            if (data.bee) {
+                bee = { ...data.bee, wingFrame: 0 };
+            }
+            
+            players.clear();
+            if (data.players) {
+                data.players.forEach(playerData => {
+                    const player = new Player(playerData);
+                    players.set(player.id, player);
+                });
+            }
+            
+            if (gameStarted) {
+                document.getElementById('waitingScreen').style.display = 'none';
+            }
+        });
+        
+        socket.on('game-started', (data) => {
+            console.log('Game started');
+            gameStarted = true;
+            isWaitingForPlayers = true;
+            document.getElementById('waitingScreen').style.display = 'none';
+        });
+        
+        socket.on('show-question', (data) => {
+            console.log('Showing question:', data.question);
+            currentQuestion = data.question;
+            isQuestionActive = true;
+            isWaitingForPlayers = false;
+            if (data.bee) {
+                bee = { ...data.bee, wingFrame: 0 };
+            }
+            
+            // Show question at top
+            document.getElementById('questionPanel').style.display = 'block';
+            document.getElementById('questionText').innerHTML = `
+                <div style="color: #FFD700; margin-bottom: 10px;">QUESTION ${currentQuestion.id}</div>
+                <div>${currentQuestion.question}</div>
+            `;
+            
+            // Show options at bottom with better formatting
+            document.getElementById('optionsPanel').style.display = 'block';
+            const optionsHtml = currentQuestion.options.map(option => {
+                const [letter, text] = option.split(': ');
+                return `<div class="option-item">
+                    <span class="option-letter">${letter}:</span>${text}
+                </div>`;
+            }).join('');
+            document.getElementById('optionsList').innerHTML = optionsHtml;
+            
+            players.clear();
+            if (data.players) {
+                data.players.forEach(playerData => {
+                    const player = new Player(playerData);
+                    players.set(player.id, player);
+                });
+            }
+        });
+        
+        socket.on('player-joined', (playerData) => {
+            const player = new Player(playerData);
+            players.set(player.id, player);
+            
+            for (let i = 0; i < 10; i++) {
+                effects.push(new Effect(
+                    player.x + (Math.random() - 0.5) * 20,
+                    player.y + (Math.random() - 0.5) * 20,
+                    'join',
+                    player.sprite.color
+                ));
+            }
+        });
+        
+        socket.on('player-moved', (data) => {
+            const player = players.get(data.id);
+            if (player) {
+                player.targetX = data.x;
+                player.targetY = data.y;
+                
+                effects.push(new Effect(data.oldX, data.oldY + 10, 'move'));
+                
+                if (data.enteredZone) {
+                    player.currentAnswer = data.enteredZone;
+                    
+                    for (let i = 0; i < 5; i++) {
+                        setTimeout(() => {
+                            effects.push(new Effect(player.x, player.y, 'answer', '#FFD700'));
+                        }, i * 50);
+                    }
+                }
+            }
+        });
+        
+        socket.on('bee-update', (data) => {
+            bee.x = data.x;
+            bee.y = data.y;
+        });
+        
+        socket.on('bee-collision', (data) => {
+            effects.push(new Effect(data.newX, data.newY, 'collision'));
+            
+            const player = players.get(data.playerId);
+            if (player) {
+                player.x = data.newX;
+                player.y = data.newY;
+                player.targetX = data.newX;
+                player.targetY = data.newY;
+            }
+        });
+        
+        socket.on('player-left', (playerId) => {
+            players.delete(playerId);
+        });
+        
+        socket.on('show-results', (results) => {
+            document.getElementById('resultPanel').style.display = 'block';
+            document.getElementById('questionPanel').style.display = 'none';
+            document.getElementById('optionsPanel').style.display = 'none';
+            
+            let html = '<div class="pixel-text">';
+            html += `<p style="margin: 10px 0; color: #00FF00;">CORRECT: ${results.correctAnswer}</p>`;
+            html += '<div style="margin: 20px 0;">';
+            
+            ['A', 'B', 'C', 'D'].forEach(option => {
+                const count = results.stats[option] || 0;
+                const isCorrect = option === results.correctAnswer;
+                html += `<div style="display: inline-block; margin: 0 10px;">
+                    <span style="color: ${isCorrect ? '#00FF00' : '#FFF'};">${option}: ${count}</span>
+                </div>`;
+            });
+            
+            html += '</div>';
+            
+            if (results.rankings && results.rankings.length > 0) {
+                html += '<div style="margin-top: 20px; font-size: 10px;">';
+                html += '<div style="color: #FFD700; margin-bottom: 10px;">TOP PLAYERS</div>';
+                results.rankings.slice(0, 5).forEach((player, index) => {
+                    const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
+                    html += `<div style="margin: 5px 0;">${medal} ${player.name}: ${player.score}</div>`;
+                });
+                html += '</div>';
+            }
+            
+            html += '</div>';
+            document.getElementById('resultContent').innerHTML = html;
+            
+            setTimeout(() => {
+                document.getElementById('resultPanel').style.display = 'none';
+                isQuestionActive = false;
+                isWaitingForPlayers = true;
+            }, 5000);
+        });
+        
+        socket.on('results-shown', () => {
+            isQuestionActive = false;
+            isWaitingForPlayers = true;
+        });
+        
+        // Start game loop
+        gameLoop();
+    </script>
+</body>
+</html>

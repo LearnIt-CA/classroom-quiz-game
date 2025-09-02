@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pixel Quiz - Player</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        
+        body {
+            font-family: 'Press Start 2P', monospace;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            color: white;
+            overflow: hidden;
+        }
+        
+        .screen {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .screen.active {
+            display: flex;
+        }
+        
+        #waitingScreen h1 {
+            color: #FFD700;
+            font-size: 20px;
+            margin-bottom: 30px;
+            text-shadow: 3px 3px 0 #000;
+            text-align: center;
+        }
+        
+        #waitingScreen p {
+            font-size: 10px;
+            margin: 10px 0;
+            text-align: center;
+        }
+        
+        .blink {
+            animation: blink 1s step-start infinite;
+        }
+        
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+        
+        #nameScreen {
+            text-align: center;
+        }
+        
+        #nameScreen h2 {
+            color: #FFD700;
+            font-size: 16px;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 0 #000;
+        }
+        
+        .name-input {
+            background: #000;
+            border: 3px solid #FFD700;
+            color: #0F0;
+            padding: 15px;
+            font-size: 16px;
+            font-family: 'Press Start 2P', monospace;
+            text-align: center;
+            width: 250px;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+        
+        .name-input:focus {
+            outline: none;
+            box-shadow: 0 0 10px #FFD700;
+        }
+        
+        .btn-confirm {
+            background: #00FF00;
+            color: #000;
+            border: 3px solid #000;
+            padding: 15px 30px;
+            font-size: 12px;
+            font-family: 'Press Start 2P', monospace;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #00AA00;
+            transition: all 0.1s;
+        }
+        
+        .btn-confirm:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+        
+        .char-limit {
+            font-size: 8px;
+            color: #888;
+            margin-top: 10px;
+        }
+        
+        .header {
+            padding: 15px;
+            background: rgba(0,0,0,0.5);
+            text-align: center;
+            border-bottom: 3px solid #FFD700;
+        }
+        
+        .player-info {
+            font-size: 12px;
+            color: #FFD700;
+            margin-bottom: 8px;
+            text-shadow: 2px 2px 0 #000;
+        }
+        
+        .status {
+            font-size: 10px;
+            color: #FFF;
+            text-shadow: 1px 1px 0 #000;
+        }
+        
+        .control-area {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .control-pad {
+            width: 240px;
+            height: 240px;
+            position: relative;
+        }
+        
+        .btn-control {
+            position: absolute;
+            width: 70px;
+            height: 70px;
+            background: #FFD700;
+            border: 3px solid #000;
+            color: #000;
+            font-size: 30px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #B8860B;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+        }
+        
+        .btn-control:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+        
+        .btn-up { top: 0; left: 85px; }
+        .btn-down { bottom: 0; left: 85px; }
+        .btn-left { left: 0; top: 85px; }
+        .btn-right { right: 0; top: 85px; }
+        
+        .center-display {
+            position: absolute;
+            top: 85px;
+            left: 85px;
+            width: 70px;
+            height: 70px;
+            background: #222;
+            border: 3px solid #FFD700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+        }
+        
+        .score-display {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: #FFD700;
+            color: #000;
+            padding: 8px 15px;
+            font-size: 10px;
+            border: 2px solid #000;
+            box-shadow: 2px 2px 0 #000;
+        }
+        
+        .answer-feedback {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            background: #00FF00;
+            color: #000;
+            padding: 20px 40px;
+            font-size: 16px;
+            border: 4px solid #000;
+            box-shadow: 0 0 0 4px #00FF00;
+            z-index: 1000;
+            animation: popIn 0.5s forwards;
+        }
+        
+        .bee-warning {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #FF0000;
+            color: #FFF;
+            padding: 20px;
+            font-size: 14px;
+            border: 4px solid #000;
+            z-index: 999;
+            animation: shake 0.5s;
+        }
+        
+        @keyframes popIn {
+            0% { transform: translate(-50%, -50%) scale(0) rotate(0deg); }
+            50% { transform: translate(-50%, -50%) scale(1.2) rotate(5deg); }
+            100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translate(-50%, -50%) rotate(0deg); }
+            25% { transform: translate(-50%, -50%) rotate(-5deg); }
+            75% { transform: translate(-50%, -50%) rotate(5deg); }
+        }
+        
+        #roundWaitScreen {
+            text-align: center;
+        }
+        
+        #roundWaitScreen h2 {
+            color: #FFD700;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        
+        #roundWaitScreen p {
+            font-size: 10px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Waiting for Game Start Screen -->
+    <div id="waitingScreen" class="screen active">
+        <h1>PIXEL QUIZ</h1>
+        <p class="blink">Waiting for game to start...</p>
+        <p style="margin-top: 20px; color: #888;">
+            Ask your teacher to start
+        </p>
+    </div>
+    
+    <!-- Round Wait Screen -->
+    <div id="roundWaitScreen" class="screen">
+        <h2>QUESTION IN PROGRESS</h2>
+        <p>Wait for the current round to finish</p>
+        <p class="blink" style="color: #FFD700; margin-top: 20px;">
+            You can join after this question!
+        </p>
+    </div>
+    
+    <!-- Name Entry Screen -->
+    <div id="nameScreen" class="screen">
+        <h2>ENTER YOUR NAME</h2>
+        <input type="text" 
+               id="nameInput" 
+               class="name-input" 
+               maxlength="8" 
+               placeholder="NAME"
+               autocomplete="off"
+               autocorrect="off"
+               autocapitalize="off"
+               spellcheck="false">
+        <br>
+        <button class="btn-confirm" onclick="confirmName()">
+            JOIN GAME
+        </button>
+        <p class="char-limit">Max 8 characters</p>
+    </div>
+    
+    <!-- Game Screen -->
+    <div id="gameScreen" class="screen">
+        <div class="score-display">
+            SCORE: <span id="score">0</span>
+        </div>
+        
+        <div class="header">
+            <div class="player-info" id="playerName">PLAYER</div>
+            <div class="status" id="gameStatus">WAITING...</div>
+        </div>
+        
+        <div class="control-area">
+            <div class="control-pad">
+                <button class="btn-control btn-up" data-dir="up">↑</button>
+                <button class="btn-control btn-down" data-dir="down">↓</button>
+                <button class="btn-control btn-left" data-dir="left">←</button>
+                <button class="btn-control btn-right" data-dir="right">→</button>
+                <div class="center-display">🎮</div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let playerName = '';
+        let hasAnswered = false;
+        let score = 0;
+        let hasJoined = false;
+        let waitingForNextRound = false;
+        
+        // Check initial status
+        socket.emit('student-join-request');
+        
+        // Screen management
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.getElementById(screenId).classList.add('active');
+        }
+        
+        // Confirm name and join
+        function confirmName() {
+            const input = document.getElementById('nameInput');
+            playerName = input.value.trim().toUpperCase();
+            
+            if (!playerName) {
+                playerName = 'P' + Math.floor(Math.random() * 9999);
+            }
+            
+            if (playerName.length > 8) {
+                playerName = playerName.substring(0, 8);
+            }
+            
+            socket.emit('confirm-join', { name: playerName });
+        }
+        
+        // Name input enter key
+        document.getElementById('nameInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                confirmName();
+            }
+        });
+        
+        // Control buttons - single tap movement
+        document.querySelectorAll('.btn-control').forEach(btn => {
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (!hasJoined) return;
+                
+                const direction = btn.dataset.dir;
+                socket.emit('player-move', direction);
+                
+                if (navigator.vibrate) {
+                    navigator.vibrate(20);
+                }
+            });
+            
+            btn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+            });
+            
+            btn.addEventListener('click', (e) => {
+                if (!hasJoined) return;
+                
+                const direction = btn.dataset.dir;
+                socket.emit('player-move', direction);
+            });
+        });
+        
+        // Prevent scrolling
+        document.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+        }, { passive: false });
+        
+        // Socket events
+        socket.on('game-not-started', (data) => {
+            showScreen('waitingScreen');
+            document.querySelector('#waitingScreen p').textContent = data.message;
+        });
+        
+        socket.on('can-join', (data) => {
+            if (!hasJoined) {
+                showScreen('nameScreen');
+            }
+        });
+        
+        socket.on('wait-for-round', (data) => {
+            waitingForNextRound = true;
+            showScreen('roundWaitScreen');
+        });
+        
+        socket.on('join-success', (data) => {
+            hasJoined = true;
+            hasAnswered = false;
+            showScreen('gameScreen');
+            document.getElementById('playerName').textContent = data.player.name;
+            
+            if (data.gameState.isWaitingForPlayers) {
+                document.getElementById('gameStatus').textContent = 'MOVE AROUND!';
+            } else {
+                document.getElementById('gameStatus').textContent = 'JOINED - WAIT FOR Q';
+            }
+            
+            score = data.player.score;
+            document.getElementById('score').textContent = score;
+        });
+        
+        socket.on('join-failed', (data) => {
+            alert(data.message);
+            if (!hasJoined) {
+                showScreen('waitingScreen');
+            }
+        });
+        
+        socket.on('game-started', (data) => {
+            if (!hasJoined) {
+                showScreen('nameScreen');
+            }
+        });
+        
+        socket.on('question-started', (data) => {
+            hasAnswered = false;
+            document.getElementById('gameStatus').textContent = `Q${data.questionNumber} - MOVE!`;
+            
+            if (navigator.vibrate) {
+                navigator.vibrate([100, 50, 100]);
+            }
+        });
+        
+        socket.on('player-moved', (data) => {
+            if (data.id === socket.id && data.enteredZone) {
+                hasAnswered = true;
+                showAnswerFeedback(data.enteredZone);
+                document.getElementById('gameStatus').textContent = `ANSWERED: ${data.enteredZone}`;
+            }
+        });
+        
+        socket.on('bee-collision', (data) => {
+            if (data.playerId === socket.id) {
+                // Show bee warning
+                const warning = document.createElement('div');
+                warning.className = 'bee-warning';
+                warning.textContent = 'BEE HIT YOU!';
+                document.body.appendChild(warning);
+                
+                // Strong vibration
+                if (navigator.vibrate) {
+                    navigator.vibrate([200, 100, 200]);
+                }
+                
+                setTimeout(() => warning.remove(), 1000);
+            }
+        });
+        
+        socket.on('results-shown', (data) => {
+            if (hasJoined) {
+                document.getElementById('gameStatus').textContent = 'CHECK DISPLAY';
+                hasAnswered = false;
+            } else if (waitingForNextRound) {
+                // Automatically show name entry screen after results
+                waitingForNextRound = false;
+                showScreen('nameScreen');
+            }
+        });
+        
+        // Show answer feedback
+        function showAnswerFeedback(answer) {
+            const feedback = document.createElement('div');
+            feedback.className = 'answer-feedback';
+            feedback.textContent = `SELECTED ${answer}!`;
+            document.body.appendChild(feedback);
+            
+            if (navigator.vibrate) {
+                navigator.vibrate([100, 50, 100, 50, 200]);
+            }
+            
+            setTimeout(() => feedback.remove(), 2000);
+        }
+    </script>
+</body>
+</html>
