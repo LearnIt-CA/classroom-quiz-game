@@ -18,6 +18,7 @@ const io = socketIO(server, {
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
+app.set('trust proxy', 1); // Make your QR code link use the correct HTTPS protocol behind a proxy.
 
 // ============ Game State Management ============
 const gameState = {
